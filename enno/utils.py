@@ -3,229 +3,180 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import re
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag, NavigableString
+from bs4.element import Tag, NavigableString, ProcessingInstruction, Doctype
+
+from .compat import *
 
 
-def html_tree(elem):
-    for el in elem:
-        if isinstance(el, Tag):
-            yield el
-            #pout.v(el.name)
-            for ele in html_tree(el):
-                yield ele
-
-        elif isinstance(el, NavigableString):
-            yield el
-            #pout.v(type(el))
-
-
-def html_tags(elem):
-    try:
-        for ch in elem.children:
-            if isinstance(ch, Tag):
-                yield ch
-                for gch in html_tags(ch):
-                    yield gch
-
-    except AttributeError:
-        pass
+# def html_tree(elem):
+#     for el in elem:
+#         if isinstance(el, Tag):
+#             yield el
+#             #pout.v(el.name)
+#             for ele in html_tree(el):
+#                 yield ele
+# 
+#         elif isinstance(el, NavigableString):
+#             yield el
+#             #pout.v(type(el))
+# 
 
 
-def normalize_html_whitespace(s):
-    s = re.sub("^\s+", " ", str(s), re.M)
-    s = re.sub("[\r\n\t]+", " ", s)
-    s = re.sub("\s+", " ", s)
-    return s
-
-
-class Block(object):
-    @property
-    def name(self):
-        ret = ""
-        if self.tag:
-            ret = self.tag.name
-        return ret
-
-    def __init__(self, tag, contents):
-        self.tag = tag
-        self.contents = contents
-
-
-class Element(object):
-
+class Tree(object):
     def __init__(self, soup):
         self.soup = soup
 
-    def tree(self):
-        for index, elem in self._html_tree(self.soup, 0):
-            yield index, elem
+    def tags(self):
+        try:
+            for ch in self.soup.children:
+                if isinstance(ch, (ProcessingInstruction, Doctype, BeautifulSoup)):
+                    continue
 
-    def blocks(self):
-        block_index = -1
-        for index, elem in self.tree():
-            if block_index >= 0:
-                if index == block_index:
-                    block_index = -1
-                    yield elem
+                elif isinstance(ch, Tag):
+                    yield ch
+                    t = type(self)(ch)
+                    for gch in t.tags():
+                        yield gch
 
-            else:
-                yield elem
-                if isinstance(elem, Tag) and elem.name in HTML.BLOCK_ELEMS:
-                    block_index = index
+        except AttributeError:
+            pass
+
+
+    def normalize_html_whitespace(self, s):
+        """
+        https://medium.com/@patrickbrosset/when-does-white-space-matter-in-html-b90e8a7cdd33
+        https://www.w3.org/TR/CSS21/text.html#white-space-model
+        https://www.w3.org/TR/CSS21/visuren.html#inline-formatting
+        """
+        s = re.sub("^\s+", " ", Plain(s), re.M)
+        s = re.sub("[\r\n\t]+", " ", s)
+        s = re.sub("\s+", " ", s)
+        return s
+
 
     def plain(self):
         strings = []
-        for block in self.blocks():
-            if isinstance(block, Tag):
-                first = True
-                is_pre = block.name == 'pre'
+        is_pre = False
+        if isinstance(self.soup, Tag) and not isinstance(self.soup, BeautifulSoup):
+            is_pre = self.soup.name == "pre"
 
-                for index, elem in type(self)(block).tree():
-                    if isinstance(elem, Tag):
-                        if elem.name == 'pre':
-                            is_pre = True
+        for e in self.soup.children:
+            if isinstance(e, (ProcessingInstruction, Doctype)):
+                continue
 
-                    elif isinstance(elem, NavigableString):
-                        if is_pre and 'pre' in set(x.name for x in elem.parents):
-                            strings.append(elem.string)
+            elif isinstance(e, NavigableString):
+                if not Plain(e).isspace():
+                    if is_pre:
+                        string = e
 
-                        else:
-                            is_pre = False
-                            string = normalize_html_whitespace(elem)
-                            if first:
+                    else:
+                        string = self.normalize_html_whitespace(e)
+                        if strings:
+                            if strings[-1].endswith(" "):
                                 string = string.lstrip()
-                                first = False
+                        else:
+                            string = string.lstrip()
 
-                            if strings:
-                                if strings[-1].endswith(" "):
-                                    string = string.lstrip()
-                            strings.append(string)
+                    strings.append(string)
 
-                if block.name in HTML.BLOCK_ELEMS:
+            elif isinstance(e, Tag):
+                t = type(self)(e)
+                string = t.plain()
+                is_pre = is_pre or e.name == "pre"
+                if not is_pre:
+                    if strings:
+                        if strings[-1].endswith(" "):
+                            string = string.lstrip()
+                    else:
+                        string = string.lstrip()
+
+                strings.append(string)
+
+                if e.name in HTML.BLOCK_ELEMS:
                     strings.append("\n")
 
-            elif isinstance(block, NavigableString):
-                strings.append(normalize_html_whitespace(str(block).strip()))
- 
         return "".join(strings)
 
 
-
-
-
-
-
-    def blocks2(self):
-        block = None
-        contents = []
-        block_index = -1
-        for index, elem in self.tree():
-            if block_index >= 0:
-                contents.append(elem)
-                if index == block_index:
-                    #block = type(self)(contents)
-                    block_index = -1
-
-            else:
-                if isinstance(elem, Tag) and elem.name in HTML.BLOCK_ELEMS:
-                    if contents:
-                        yield Block(block, contents)
-                        block = None
-                        contents = []
-
-                    block = elem
-                    block_index = index
-
-                else:
-                    contents.append(elem)
-
-        if contents:
-            yield Block(block, contents)
-
-    def _html_tree(self, elem, index):
-        for el in elem:
-            if isinstance(el, Tag):
-                yield index, el
-                #pout.v(el.name)
-                for i, ele in self._html_tree(el, index + 1):
-                    yield i, ele
-
-            elif isinstance(el, NavigableString):
-                yield index, el
-                #pout.v(type(el))
-
-#     def __iter__(self):
-#         for elem in self.soup:
-#             yield elem
-
-    def plain3(self):
-        strings = []
-        for element in self.blocks():
-            for elem in element.soup[1:]:
-                if isinstance(elem, Tag):
-                    if elem.name in HTML.BLOCK_ELEMS:
-                        element2 = type(self)(elem)
-                        for elem2 in element2.blocks():
-                            strings.append(elem2.plain())
-
-                else:
-                    string = elem.string
-                    if string is not None:
-                        strings.append(string)
-
-        ret = "".join(strings)
-        lines = []
-        for line in ret.splitlines(False):
-            lines.append(line)
-        return "".join(lines)
-
-
-
-    def plain2(self):
-        strings = []
-        for elem in self.soup:
-            string = elem.string
-            if string is not None:
-                strings.append(string)
-
-            if isinstance(elem, Tag):
-                if elem.name in HTML.BLOCK_ELEMS:
-                    element = type(self)(elem)
-                    for el in element.blocks():
-                        strings.append(el.plain())
-
-        ret = "".join(strings)
-        pout.v(ret)
-        lines = []
-        for line in ret.splitlines(False):
-            lines.append(line)
-        return "".join(lines)
-
-
-
-
-
-
-
-
-
-
-# class Soup(BeautifulSoup):
-#     def tags(self):
-#         def _tags(elem):
-#             try:
-#                 for ch in elem.children:
-#                     if isinstance(ch, Tag):
-#                         yield ch
-#                         for gch in _tags(ch):
-#                             yield gch
+# class Element(object):
 # 
-#             except AttributeError:
-#                 pass
+#     def __init__(self, soup):
+#         self.soup = soup
 # 
-#         for tag in _tags(self):
-#             yield tag
+#     def tree(self):
+#         for index, elem in self._html_tree(self.soup, 0):
+#             yield index, elem
 # 
+#     def blocks(self):
+#         block_index = -1
+#         for index, elem in self.tree():
+#             if block_index >= 0:
+#                 if index == block_index:
+#                     block_index = -1
+#                     yield elem
+# 
+#             else:
+#                 yield elem
+#                 if isinstance(elem, Tag) and elem.name in HTML.BLOCK_ELEMS:
+#                     block_index = index
+# 
+#     def plain(self):
+#         strings = []
+#         for block in self.blocks():
+#             if isinstance(block, (ProcessingInstruction, Doctype)):
+#                 continue
+# 
+#             if isinstance(block, Tag):
+#                 first = True
+#                 is_pre = block.name == 'pre'
+#                 is_block = block.name in HTML.BLOCK_ELEMS
+# 
+#                 for index, elem in type(self)(block).tree():
+#                     if isinstance(elem, Tag):
+#                         is_pre = is_pre or elem.name == 'pre'
+#                         is_block = is_block or elem.name in HTML.BLOCK_ELEMS
+# 
+#                     elif isinstance(elem, NavigableString):
+#                         #pout.v(str(elem))
+#                         if is_pre:
+#                         #if is_pre and 'pre' in set(x.name for x in elem.parents):
+#                             strings.append(elem.string)
+# 
+#                         else:
+#                             is_pre = False
+#                             string = normalize_html_whitespace(elem)
+#                             if first:
+#                                 string = string.lstrip()
+#                                 first = False
+# 
+#                             if strings:
+#                                 if strings[-1].endswith(" "):
+#                                     string = string.lstrip()
+#                             strings.append(string)
+# 
+#                 if is_block:
+#                     strings.append("\n")
+# 
+#             elif isinstance(block, NavigableString):
+#                 strings.append(normalize_html_whitespace(str(block).strip()))
+#  
+#         return "".join(strings)
+# 
+# 
+# 
+# 
+# 
+#     def _html_tree(self, elem, index):
+#         for el in elem:
+#             if isinstance(el, Tag):
+#                 yield index, el
+#                 #pout.v(el.name)
+#                 for i, ele in self._html_tree(el, index + 1):
+#                     yield i, ele
+# 
+#             elif isinstance(el, NavigableString):
+#                 yield index, el
+#                 #pout.v(type(el))
 
 
 # class String(str):
@@ -239,9 +190,18 @@ class Element(object):
 #         raise NotImplementedError()
 
 
-class Plain(str):
-#     class __new__(cls, s):
-#         instance = super(
+class Plain(unicode):
+    def __new__(cls, val, encoding="UTF-8"):
+        if not encoding:
+            encoding = sys.getdefaultencoding()
+
+        if is_py2:
+            if isinstance(val, str):
+                val = val.decode(encoding)
+
+        instance = super(Plain, cls).__new__(cls, val)
+        instance.encoding = encoding
+        return instance
 
     def plain(self):
         return type(self)(self)
@@ -485,7 +445,8 @@ class HTML(Plain):
         if tag is None:
             tag = soup
 
-        for elem in html_tags(tag):
+        t = Tree(tag)
+        for elem in t.tags():
             if elem.name in self.PERMITTED_ELEMS:
                 for k in elem.attrs.keys():
                     for kn in self.PROHIBITED_ATTRS:
@@ -515,55 +476,18 @@ class HTML(Plain):
 
     def plain(self):
         soup = self.soup
-        # TODO -- convert all <br /> to newlines?
-
-#         for elem in html_tree(soup):
-#             if isinstance(el, Tag):
-#                 yield el
-#                 #pout.v(el.name)
-#                 for ele in html_tree(el):
-#                     yield ele
-# 
-#             elif isinstance(el, NavigableString):
-#                 pass
-
-        return ""
-        return soup.get_text()
-
-
-
-
-
-        def get_lines(tag):
-            ret = []
-            for elem in tag.children:
-                if isinstance(elem, Tag):
-                    if elem.name in self.BLOCK_ELEMS:
-                        line = elem.prettify().strip() + "\n"
-
-                    elif elem.name in self.INLINE_ELEMS:
-                        line = elem.prettify().strip()
-
-                else:
-                    line = str(elem).strip()
-
-                if line and not line.isspace():
-                    ret.append(line)
-            return ret
-
-        lines = []
-        lines.extend(get_lines(soup))
-        for sibling in soup.next_siblings:
-            lines.extend(get_lines(sibling))
-
-        return Plain("".join(lines))
-        #return Plain("".join(soup.strings))
+        elem = Tree(self.soup)
+        return elem.plain()
 
     def html(self):
         return type(self)(self)
 
 
 class ENML(HTML):
+    """Evernote's markup language should be encapsulated in this class
+
+    http://dev.evernote.com/doc/articles/enml.php
+    """
     def enml(self):
         return type(self)(self)
 

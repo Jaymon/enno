@@ -5,7 +5,7 @@ import datetime
 #import evernote.edam.notestore.ttypes as Notebook
 from evernote.edam.type.ttypes import Notebook, Note
 
-from .query import Query, NotebookQuery
+from .query import NoteQuery, NotebookQuery
 from .interface import get_interface
 from .decorators import classproperty
 from .compat import *
@@ -13,13 +13,22 @@ from .utils import Plain, HTML, ENML
 
 
 class Enbase(object):
+    query_class = None
+    """Query class that will be used to query the different child class things like
+    notes or notebooks, this is set in the child classes"""
+
     @classproperty
     def interface(cls):
+        """returns the interface singleton"""
         return get_interface()
 
     @classproperty
     def query(cls):
-        raise NotImplementedError()
+        """Provide fluid interface to query things
+
+        :returns: query.Query instance
+        """
+        return cls.query_class(cls)
 
     @property
     def note_store(self):
@@ -58,15 +67,18 @@ class Enbase(object):
 
 
 class Ennote(Enbase):
+    """Encapsulates Evernote's raw note information in order to make it more fluid
+    so you don't have to worry about things like loading the full note and unicode
+    problems
 
-    query_cls = Query
+    also gives you fast access to note querying using .query
+    """
 
-    notebook_cls = None
+    query_class = NoteQuery
+    """Query class that will be used to query notes"""
+
+    notebook_class = None
     """set at the very bottom of this module"""
-
-    @classproperty
-    def query(cls):
-        return cls.query_cls(cls)
 
     @property
     def created(self):
@@ -79,7 +91,7 @@ class Ennote(Enbase):
     @property
     def notebook(self):
         """Returns the notebook this note belongs to"""
-        return self.notebook_cls.query.is_guid(self.notebookGuid).get_one()
+        return self.notebook_class.query.is_guid(self.notebookGuid).get_one()
 
     @notebook.setter
     def notebook(self, nb):
@@ -117,12 +129,6 @@ class Ennote(Enbase):
 #             title = p.title
 #             if title:
 #                 self.title = title
-
-#     @property
-#     def note(self):
-#         ret = self.note_store.getNote(self.guid, True, False, False, False)
-#         self.__dict__["note"] = ret
-#         return ret
 
     def __init__(self, note=None, **kwargs):
         if note:
@@ -207,32 +213,20 @@ class Ennote(Enbase):
         for k, v in orig_vals.items():
             setattr(self, k, v)
 
-#         if k in ["title", "guid"]:
-#             ret = getattr(self._note, k)
-# 
-#         elif not k.startswith("__"):
-#             note = self.note
-#             ret = getattr(self.note, k)
-# 
-#         else:
-#             raise AttributeError(k)
-# 
-#         return ret
-
 
 class Ennotebook(Enbase):
     """
     https://dev.evernote.com/doc/reference/Types.html#Struct_Notebook
     """
-    query_cls = NotebookQuery
+    query_class = NotebookQuery
 
-    @classproperty
-    def query(cls):
-        return cls.query_cls(cls)
+    note_class = None
+    """set at the bottom of this module"""
 
     @property
     def notes(self):
         """Returns all the notes in this notebook"""
+        return self.note_class.query.is_notebook(self).all()
 
     @property
     def created(self):
@@ -277,8 +271,8 @@ class Ennotebook(Enbase):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-#     def is_default(self):
-#         return self.default
+    def is_default(self):
+        return self.default
 
     def save(self):
 
@@ -306,14 +300,13 @@ class Ennotebook(Enbase):
 
     def count(self):
         """Return how many notes are in this notebook"""
-        # TODO -- this can be done by running a note query with just the
-        # notebook and then call noteCounts or something like that
-
         # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_findNoteCounts (use this one)
         # http://dev.evernote.com/doc/reference/NoteStore.html#Struct_NoteCollectionCounts
+        return self.note_class.query.is_notebook(self).count()
+
+    __len__ = count
 
 
-
-Ennote.notebook_cls = Ennotebook
-Ennotebook.note_cls = Ennote
+Ennote.notebook_class = Ennotebook
+Ennotebook.note_class = Ennote
 

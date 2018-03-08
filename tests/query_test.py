@@ -5,13 +5,29 @@ import random
 
 import testdata
 
-from enno.query import Query
+from enno.query import NoteQuery, NotebookQuery
 from enno.model import Ennote, Ennotebook
 
 
-class QueryTest(TestCase):
+class NotebookQueryTest(TestCase):
+    def get_query(self):
+        return Ennotebook.query
+
+    def test_is_name(self):
+        nb = random.choice(list(self.get_query().get()))
+
+        nb1 = self.get_query().is_name(nb.name).one()
+        self.assertEqual(nb.name, nb1.name)
+
+
+class NoteQueryTest(TestCase):
     def get_query(self):
         return Ennote.query
+
+    def test_is_guid(self):
+        r1 = self.get_query().one()
+        r2 = self.get_query().is_guid(r1.guid).one()
+        self.assertEqual(r1.guid, r2.guid)
 
     def test_sort_order_1(self):
         q = self.get_query()
@@ -66,7 +82,7 @@ class QueryTest(TestCase):
         q = self.get_query().nin_note("foo bar", "che")
         self.assertEqual('-"foo bar" -che', q.note_filter.words)
 
-        q = self.get_query().nin_note("foo bar").in_words("che")
+        q = self.get_query().nin_note("foo bar").in_note("che")
         self.assertEqual('-"foo bar" che', q.note_filter.words)
 
     def test_in_nin_title(self):

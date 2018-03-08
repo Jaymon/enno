@@ -19,6 +19,3 @@ class AuthServerTest(TestCase):
             self.assertEqual({"foo": "bar", "baz": "che"}, ret)
 
 
-class Query
-
-

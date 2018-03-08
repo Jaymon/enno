@@ -7,6 +7,7 @@ import copy
 import evernote.edam.notestore.ttypes as NoteStore 
 
 from .compat import *
+from .utils import Plain
 
 
 class Iterator(list):
@@ -90,7 +91,7 @@ class Iterator(list):
                 itr = self.query.copy().offset(offset).get()
 
 
-class Query(object):
+class NoteQuery(object):
     """
     searching notes:
         https://dev.evernote.com/doc/articles/searching_notes.php
@@ -101,6 +102,7 @@ class Query(object):
         self.interface = note_class.interface
         self.note_store = self.interface.get_note_store()
         self.note_filter = NoteStore.NoteFilter()
+        self.guids = set()
 
         self.spec = NoteStore.NotesMetadataResultSpec()
         # These are the spec instance properties you can set:
@@ -142,6 +144,15 @@ class Query(object):
         self.bounds["offset"] = int(offset)
         return self
 
+    def is_guid(self, guid):
+        self.guids.clear()
+        self.guids.add(guid)
+        return self
+
+    def in_guid(self, *guids):
+        self.guids.update(guids)
+        return self
+
     def is_notebook(self, nb):
         if hasattr(nb, "guid"):
             self.note_filter.notebookGuid = nb.guid
@@ -151,11 +162,11 @@ class Query(object):
 
         else:
             name = nb
-            nb = self.model_class.notebook_class.query.is_name(name).get_one()
+            nb = self.model_class.notebook_class.query.is_name(name).one()
             if nb:
                 self.note_filter.notebookGuid = nb.guid
             else:
-                raise ValueError("Notebook {} was not found".format(name))
+                raise ValueError("Notebook {} was not found".format(Plain(name)))
 
         return self
 
@@ -213,18 +224,43 @@ class Query(object):
         return self._format_relative("year", count)
 
     def get(self, limit=0, offset=0):
-        if limit: self.limit(limit)
-        if offset: self.offset(offset)
+        if self.guids:
+            items = []
+            #pout.i(self.note_store._client)
+            for guid in self.guids:
+                # python evernote doesn't seem to have this method:
+                # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_getNoteWithResultSpec
+                #items.append(self.note_store.getNoteWithResultSpec(guid, self.spec))
+                # so we will use the deprecated method:
+                items.append(self.note_store.getNote(
+                    guid,
+                    False,
+                    False,
+                    False,
+                    False,
+                ))
 
-        response = self.note_store.findNotesMetadata(
-            self.note_filter,
-            self.bounds["offset"],
-            self.bounds["limit"],
-            self.spec
-        )
+            # TODO -- should this take into account asc and desc?
+
+            # ducktype the response for the iterator
+            class Response(object): pass
+            response = Response()
+            response.totalNotes = len(self.guids)
+
+        else:
+            if limit: self.limit(limit)
+            if offset: self.offset(offset)
+
+            response = self.note_store.findNotesMetadata(
+                self.note_filter,
+                self.bounds["offset"],
+                self.bounds["limit"],
+                self.spec
+            )
+            items = response.notes
 
         return Iterator(
-            items=response.notes,
+            items=items,
             response=response,
             model_class=self.model_class,
             query=self
@@ -338,26 +374,27 @@ class NotebookQuery(object):
         return self
 
     def startswith_name(self, name):
-        name = name.lower()
-        self.filter_cbs.append(lambda x: x.name.lower().startswith(name))
+        name = Plain(name).lower()
+        self.filter_cbs.append(lambda x: Plain(x.name).lower().startswith(name))
         return self
 
     def endswith_name(self, name):
-        name = name.lower()
-        self.filter_cbs.append(lambda x: x.name.lower().endswith(name))
+        name = Plain(name).lower()
+        self.filter_cbs.append(lambda x: Plain(x.name).lower().endswith(name))
         return self
 
     def contains_name(self, name):
-        name = name.lower()
-        self.filter_cbs.append(lambda x: name in x.name.lower())
+        name = Plain(name).lower()
+        self.filter_cbs.append(lambda x: name in Plain(x.name).lower())
         return self
 
     def is_name(self, name):
-        name = name.lower()
-        self.filter_cbs.append(lambda x: name == x.name.lower())
+        name = Plain(name).lower()
+        self.filter_cbs.append(lambda x: name == Plain(x.name).lower())
         return self
 
     def is_guid(self, guid):
+        self.guids.clear()
         self.guids.add(guid)
         #self.filter_cbs.append(lambda x: guid == x.guid)
         return self

@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 from unittest import TestCase
+import time
 
 import testdata
 
 from enno.model import Ennotebook, Ennote
+from enno.utils import HTML
 
 
 class EnnoteTest(TestCase):
@@ -34,22 +36,17 @@ class EnnoteTest(TestCase):
         n.notebook = nb
         self.assertEqual(n.notebook_guid, nb.guid)
 
-    def test_content_1(self):
+    def test_content(self):
         n = Ennote()
 
-        n = Ennote.query.one()
-        pout.v(n.content)
+        plain = testdata.get_words()
+        n.plain = plain
+        self.assertTrue(plain in n.content)
 
-
-        r = n.html
-        pout.v(r)
-
-        r = n.plain
-        pout.v(r)
-
-
-
-
+        html = "<p>{}</p>".format(testdata.get_words())
+        n.html = html
+        self.assertFalse(plain in n.content)
+        self.assertTrue(HTML(html).plain() in n.content)
 
         # TODO -- test & in note
 
@@ -75,11 +72,25 @@ and they lived at the bottom of a well.</p>
         n.notebook = nb
         n.save()
         self.assertIsNotNone(n.guid)
-        pout.v(n.content)
 
         n2 = Ennote.query.is_guid(n.guid).one()
-        pout.v(n2.plain)
 
+    def test_crud(self):
+        n = Ennote()
+        title = testdata.get_ascii()
+        plain = testdata.get_words()
+        n.title = title
+        n.plain = plain
+        n.save()
+
+        guid = n.guid
+
+        n.title = testdata.get_ascii()
+        n.plain = testdata.get_words()
+        n.save()
+        self.assertEqual(guid, n.guid)
+        self.assertNotEqual(title, n.title)
+        self.assertNotEqual(plain, n.plain)
 
 
 class EnnotebookTest(TestCase):
@@ -107,6 +118,7 @@ class EnnotebookTest(TestCase):
         name2 = testdata.get_words()
         nb.name = name2
         self.assertNotEqual(name, nb.name)
+        time.sleep(1)
         nb.save()
         self.assertEqual(name2, nb.name)
         self.assertNotEqual(updated, nb.updated)
