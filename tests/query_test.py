@@ -6,12 +6,12 @@ import random
 import testdata
 
 from enno.query import NoteQuery, NotebookQuery
-from enno.model import Ennote, Ennotebook
+from enno.model import Note, Notebook
 
 
 class NotebookQueryTest(TestCase):
     def get_query(self):
-        return Ennotebook.query
+        return Notebook.query
 
     def test_is_name(self):
         nb = random.choice(list(self.get_query().get()))
@@ -19,10 +19,17 @@ class NotebookQueryTest(TestCase):
         nb1 = self.get_query().is_name(nb.name).one()
         self.assertEqual(nb.name, nb1.name)
 
+    def test_all_names(self):
+        raise self.skipTest("This uses a lot of api requests")
+        nbs = list(self.get_query().get())
+        for nb in nbs:
+            nb1 = self.get_query().is_name(nb.name).one()
+            self.assertEqual(nb.name, nb1.name)
+
 
 class NoteQueryTest(TestCase):
     def get_query(self):
-        return Ennote.query
+        return Note.query
 
     def test_is_guid(self):
         r1 = self.get_query().one()
@@ -55,7 +62,7 @@ class NoteQueryTest(TestCase):
             guid = r.guid
 
     def test_is_notebook(self):
-        nb = random.choice(list(Ennotebook.query.get()))
+        nb = random.choice(list(Notebook.query.get()))
 
         ns1 = self.get_query().is_notebook(nb.name).get()
         ns2 = self.get_query().is_notebook(nb.guid).get()

@@ -8,20 +8,6 @@ from bs4.element import Tag, NavigableString, ProcessingInstruction, Doctype
 from .compat import *
 
 
-# def html_tree(elem):
-#     for el in elem:
-#         if isinstance(el, Tag):
-#             yield el
-#             #pout.v(el.name)
-#             for ele in html_tree(el):
-#                 yield ele
-# 
-#         elif isinstance(el, NavigableString):
-#             yield el
-#             #pout.v(type(el))
-# 
-
-
 class Tree(object):
     def __init__(self, soup):
         self.soup = soup
@@ -96,98 +82,6 @@ class Tree(object):
                     strings.append("\n")
 
         return "".join(strings)
-
-
-# class Element(object):
-# 
-#     def __init__(self, soup):
-#         self.soup = soup
-# 
-#     def tree(self):
-#         for index, elem in self._html_tree(self.soup, 0):
-#             yield index, elem
-# 
-#     def blocks(self):
-#         block_index = -1
-#         for index, elem in self.tree():
-#             if block_index >= 0:
-#                 if index == block_index:
-#                     block_index = -1
-#                     yield elem
-# 
-#             else:
-#                 yield elem
-#                 if isinstance(elem, Tag) and elem.name in HTML.BLOCK_ELEMS:
-#                     block_index = index
-# 
-#     def plain(self):
-#         strings = []
-#         for block in self.blocks():
-#             if isinstance(block, (ProcessingInstruction, Doctype)):
-#                 continue
-# 
-#             if isinstance(block, Tag):
-#                 first = True
-#                 is_pre = block.name == 'pre'
-#                 is_block = block.name in HTML.BLOCK_ELEMS
-# 
-#                 for index, elem in type(self)(block).tree():
-#                     if isinstance(elem, Tag):
-#                         is_pre = is_pre or elem.name == 'pre'
-#                         is_block = is_block or elem.name in HTML.BLOCK_ELEMS
-# 
-#                     elif isinstance(elem, NavigableString):
-#                         #pout.v(str(elem))
-#                         if is_pre:
-#                         #if is_pre and 'pre' in set(x.name for x in elem.parents):
-#                             strings.append(elem.string)
-# 
-#                         else:
-#                             is_pre = False
-#                             string = normalize_html_whitespace(elem)
-#                             if first:
-#                                 string = string.lstrip()
-#                                 first = False
-# 
-#                             if strings:
-#                                 if strings[-1].endswith(" "):
-#                                     string = string.lstrip()
-#                             strings.append(string)
-# 
-#                 if is_block:
-#                     strings.append("\n")
-# 
-#             elif isinstance(block, NavigableString):
-#                 strings.append(normalize_html_whitespace(str(block).strip()))
-#  
-#         return "".join(strings)
-# 
-# 
-# 
-# 
-# 
-#     def _html_tree(self, elem, index):
-#         for el in elem:
-#             if isinstance(el, Tag):
-#                 yield index, el
-#                 #pout.v(el.name)
-#                 for i, ele in self._html_tree(el, index + 1):
-#                     yield i, ele
-# 
-#             elif isinstance(el, NavigableString):
-#                 yield index, el
-#                 #pout.v(type(el))
-
-
-# class String(str):
-#     def plain(self):
-#         raise NotImplementedError()
-# 
-#     def html(self):
-#         raise NotImplementedError()
-# 
-#     def enml(self):
-#         raise NotImplementedError()
 
 
 class Plain(unicode):

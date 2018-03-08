@@ -163,10 +163,12 @@ class NoteQuery(object):
         else:
             name = nb
             nb = self.model_class.notebook_class.query.is_name(name).one()
-            if nb:
-                self.note_filter.notebookGuid = nb.guid
-            else:
+
+            if nb is None:
                 raise ValueError("Notebook {} was not found".format(Plain(name)))
+
+            else:
+                self.note_filter.notebookGuid = nb.guid
 
         return self
 

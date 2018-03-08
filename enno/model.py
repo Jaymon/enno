@@ -3,7 +3,7 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import datetime
 
 #import evernote.edam.notestore.ttypes as Notebook
-from evernote.edam.type.ttypes import Notebook, Note
+from evernote.edam.type.ttypes import Notebook as EvernoteNotebook, Note as EvernoteNote
 
 from .query import NoteQuery, NotebookQuery
 from .interface import get_interface
@@ -66,7 +66,7 @@ class Enbase(object):
         return ret
 
 
-class Ennote(Enbase):
+class Note(Enbase):
     """Encapsulates Evernote's raw note information in order to make it more fluid
     so you don't have to worry about things like loading the full note and unicode
     problems
@@ -135,7 +135,7 @@ class Ennote(Enbase):
             self.note = note
             self._hydrated = False
         else:
-            self.note = Note()
+            self.note = EvernoteNote()
             self._hydrated = True
 
         for k, v in kwargs.items():
@@ -155,7 +155,7 @@ class Ennote(Enbase):
 
     def __getattr__(self, k):
         if k.startswith("_"):
-            ret = super(Ennote, self).__getattr__(k)
+            ret = super(Note, self).__getattr__(k)
 
         else:
             k = self.convert_key(k)
@@ -170,13 +170,13 @@ class Ennote(Enbase):
 
     def __setattr__(self, k, v):
         if k.startswith("_"):
-            super(Ennote, self).__setattr__(k, v)
+            super(Note, self).__setattr__(k, v)
 
         elif k == "note":
-            super(Ennote, self).__setattr__(k, v)
+            super(Note, self).__setattr__(k, v)
 
         elif k in self.__dict__:
-            super(Ennote, self).__setattr__(k, v)
+            super(Note, self).__setattr__(k, v)
 
         else:
             k = self.convert_key(k)
@@ -184,7 +184,7 @@ class Ennote(Enbase):
                 setattr(self.note, k, v)
 
             else:
-                super(Ennote, self).__setattr__(k, v)
+                super(Note, self).__setattr__(k, v)
 
     def save(self):
         note_store = self.note_store
@@ -214,7 +214,7 @@ class Ennote(Enbase):
             setattr(self, k, v)
 
 
-class Ennotebook(Enbase):
+class Notebook(Enbase):
     """
     https://dev.evernote.com/doc/reference/Types.html#Struct_Notebook
     """
@@ -267,7 +267,7 @@ class Ennotebook(Enbase):
         self.notebook.default = bool(v)
 
     def __init__(self, notebook=None, **kwargs):
-        self.notebook = Notebook() if notebook is None else notebook
+        self.notebook = EvernoteNotebook() if notebook is None else notebook
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -307,6 +307,6 @@ class Ennotebook(Enbase):
     __len__ = count
 
 
-Ennote.notebook_class = Ennotebook
-Ennotebook.note_class = Ennote
+Note.notebook_class = Notebook
+Notebook.note_class = Note
 

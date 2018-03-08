@@ -5,28 +5,28 @@ import time
 
 import testdata
 
-from enno.model import Ennotebook, Ennote
+from enno.model import Notebook, Note
 from enno.utils import HTML
 
 
-class EnnoteTest(TestCase):
+class NoteTest(TestCase):
     def test_notebook(self):
         n = None
-        for nb in Ennotebook.query.get():
-            n = Ennote.query.is_notebook(nb).get_one()
+        for nb in Notebook.query.get():
+            n = Note.query.is_notebook(nb).get_one()
             if n is not None:
                 break
         self.assertIsNotNone(n)
 
-#         nb = testdata.random.choice(list(Ennotebook.query.get()))
-#         n = Ennote.query.is_notebook(nb).get_one()
+#         nb = testdata.random.choice(list(Notebook.query.get()))
+#         n = Note.query.is_notebook(nb).get_one()
 
         nb2 = n.notebook
         self.assertEqual(nb.guid, nb2.guid)
 
     def test_notebook_set(self):
-        n = Ennote()
-        nb = testdata.random.choice(list(Ennotebook.query.get()))
+        n = Note()
+        nb = testdata.random.choice(list(Notebook.query.get()))
 
         self.assertIsNone(n.notebook_guid)
         n.notebook_guid = nb.guid
@@ -37,7 +37,7 @@ class EnnoteTest(TestCase):
         self.assertEqual(n.notebook_guid, nb.guid)
 
     def test_content(self):
-        n = Ennote()
+        n = Note()
 
         plain = testdata.get_words()
         n.plain = plain
@@ -51,8 +51,8 @@ class EnnoteTest(TestCase):
         # TODO -- test & in note
 
     def test_html(self):
-        n = Ennote()
-        nb = testdata.random.choice(list(Ennotebook.query.get()))
+        n = Note()
+        nb = testdata.random.choice(list(Notebook.query.get()))
         html_doc = """
 <p class="title"><b>The Dormouse's story</b></p>
 
@@ -73,10 +73,10 @@ and they lived at the bottom of a well.</p>
         n.save()
         self.assertIsNotNone(n.guid)
 
-        n2 = Ennote.query.is_guid(n.guid).one()
+        n2 = Note.query.is_guid(n.guid).one()
 
     def test_crud(self):
-        n = Ennote()
+        n = Note()
         title = testdata.get_ascii()
         plain = testdata.get_words()
         n.title = title
@@ -93,12 +93,12 @@ and they lived at the bottom of a well.</p>
         self.assertNotEqual(plain, n.plain)
 
 
-class EnnotebookTest(TestCase):
+class NotebookTest(TestCase):
     def get_query(self):
-        return Ennotebook.query
+        return Notebook.query
 
     def test_crud(self):
-        nb = Ennotebook()
+        nb = Notebook()
         self.assertIsNone(nb.guid)
         self.assertIsNone(nb.name)
         self.assertIsNone(nb.created)
