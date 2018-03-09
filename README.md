@@ -95,7 +95,11 @@ print(nb.guid)
 
 ## Installation
 
-Use pip
+Use pip:
 
     $ pip install enno
+
+To get the latest and greatest:
+
+    $ pip install git+https://github.com/jaymon/enno#egg=enno
 
