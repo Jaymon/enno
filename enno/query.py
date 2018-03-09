@@ -96,6 +96,10 @@ class NoteQuery(object):
     searching notes:
         https://dev.evernote.com/doc/articles/searching_notes.php
         https://dev.evernote.com/doc/articles/search.php (python examples)
+        https://dev.evernote.com/doc/articles/search_grammar.php
+
+    all Thrift functions:
+        http://dev.evernote.com/doc/reference/
     """
     def __init__(self, note_class):
         self.model_class = note_class
@@ -234,6 +238,7 @@ class NoteQuery(object):
                 # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_getNoteWithResultSpec
                 #items.append(self.note_store.getNoteWithResultSpec(guid, self.spec))
                 # so we will use the deprecated method:
+                # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_getNote
                 items.append(self.note_store.getNote(
                     guid,
                     False,
@@ -253,6 +258,7 @@ class NoteQuery(object):
             if limit: self.limit(limit)
             if offset: self.offset(offset)
 
+            # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_findNotesMetadata
             response = self.note_store.findNotesMetadata(
                 self.note_filter,
                 self.bounds["offset"],

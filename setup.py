@@ -18,7 +18,8 @@ def read(path):
 
 vpath = os.path.join(name, "__init__.py")
 if not os.path.isfile(vpath): vpath = os.path.join("{}.py".format(name))
-version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", read(vpath), flags=re.I | re.M).group(1)
+with open(vpath, encoding="utf-8") as f:
+    version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", f.read(), flags=re.I | re.M).group(1)
 
 long_description = read('README.rst')
 

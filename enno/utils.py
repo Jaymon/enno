@@ -9,6 +9,10 @@ from .compat import *
 
 
 class Tree(object):
+    """
+    https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+    http://bazaar.launchpad.net/~leonardr/beautifulsoup/bs4/view/head:/bs4/__init__.py
+    """
     def __init__(self, soup):
         self.soup = soup
 
@@ -46,6 +50,8 @@ class Tree(object):
         if isinstance(self.soup, Tag) and not isinstance(self.soup, BeautifulSoup):
             is_pre = self.soup.name == "pre"
 
+        # this is basically a pre-order tree traversal
+        # https://en.wikipedia.org/wiki/Tree_traversal
         for e in self.soup.children:
             if isinstance(e, (ProcessingInstruction, Doctype)):
                 continue

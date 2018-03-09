@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 
+# https://github.com/evernote/evernote-sdk-python/
+# https://dev.evernote.com/doc/start/python.php
 import evernote.edam.userstore.constants as UserStoreConstants
 
 from . import environ
@@ -8,7 +10,7 @@ from .interface import get_interface
 from .model import Note, Notebook
 
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 
 def check_api():

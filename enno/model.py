@@ -187,6 +187,10 @@ class Note(Enbase):
                 super(Note, self).__setattr__(k, v)
 
     def save(self):
+        """create/update the note
+
+        https://dev.evernote.com/doc/articles/creating_notes.php
+        """
         note_store = self.note_store
 
         orig_keys = ["title", "content"]
