@@ -10,7 +10,7 @@ from .interface import get_interface
 from .model import Note, Notebook
 
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 
 def check_api():

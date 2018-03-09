@@ -17,7 +17,7 @@ def read(path):
 
 
 vpath = os.path.join(name, "__init__.py")
-if not os.path.isfile(vpath): vpath = os.path.join("{}.py".format(name))
+#if not os.path.isfile(vpath): vpath = os.path.join("{}.py".format(name))
 with open(vpath, encoding="utf-8") as f:
     version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", f.read(), flags=re.I | re.M).group(1)
 
