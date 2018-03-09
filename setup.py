@@ -24,8 +24,7 @@ with open(vpath, encoding="utf-8") as f:
 long_description = read('README.rst')
 
 tests_modules = ["testdata", "requests"]
-install_modules = list(filter(None, read("requirements.txt").splitlines(False)))
-
+install_modules = ["evernote", "captain", "beautifulsoup4"]
 
 setup(
     name=name,
