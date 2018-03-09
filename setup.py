@@ -17,7 +17,7 @@ def read(path):
 
 
 vpath = os.path.join(name, "__init__.py")
-#if not os.path.isfile(vpath): vpath = os.path.join("{}.py".format(name))
+if not os.path.isfile(vpath): vpath = os.path.join("{}.py".format(name))
 with open(vpath, encoding="utf-8") as f:
     version = re.search("^__version__\s*=\s*[\'\"]([^\'\"]+)", f.read(), flags=re.I | re.M).group(1)
 
@@ -30,13 +30,13 @@ install_modules = list(filter(None, read("requirements.txt").splitlines(False)))
 setup(
     name=name,
     version=version,
-    description='PLACEHOLDER',
+    description='Wrapper around Evernote\'s python client',
     long_description=long_description,
     author='Jay Marcyes',
     author_email='jay@marcyes.com',
     url='http://github.com/Jaymon/{}'.format(name),
-    py_modules=[name], # files
-    # packages=find_packages(), # folders
+    #py_modules=[name], # files
+    packages=find_packages(), # folders
     license="MIT",
     install_requires=install_modules,
     tests_require=tests_modules,
