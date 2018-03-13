@@ -8,6 +8,32 @@ from bs4.element import Tag, NavigableString, ProcessingInstruction, Doctype
 from .compat import *
 
 
+class TypeList(list):
+    """A list that runs type() on an item on entry into the list
+
+    https://docs.python.org/3/tutorial/datastructures.html#more-on-lists
+    """
+    def __init__(self, type, iterable=None):
+        self.type = type
+        if not iterable: iterable = []
+        super(TypeList, self).__init__()
+        self.extend(iterable)
+
+    def append(self, item):
+        super(TypeList, self).append(self.type(item))
+
+    def extend(self, iterable):
+        super(TypeList, self).extend(self.type(item) for item in iterable)
+
+    def __setitem__(self, k, item):
+        item = self.type(item)
+        super(TypeList, self).__setitem__(k, item)
+
+    def insert(self, i, item):
+        item = self.type(item)
+        super(TypeList, self).insert(i, item)
+
+
 class Tree(object):
     """
     https://www.crummy.com/software/BeautifulSoup/bs4/doc/

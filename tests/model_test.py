@@ -5,7 +5,7 @@ import time
 
 import testdata
 
-from enno.model import Notebook, Note
+from enno.model import Notebook, Note, Tag
 from enno.utils import HTML
 
 
@@ -35,6 +35,49 @@ class NoteTest(TestCase):
         nb_guid = n.notebook_guid
         n.notebook = nb
         self.assertEqual(n.notebook_guid, nb.guid)
+
+        n.notebook = None
+        self.assertIsNone(n.notebook_guid)
+
+        n.notebook = nb.name
+        self.assertIsNone(n.notebook_guid)
+        self.assertEqual(n.notebook.name, nb.name)
+        n.notebook = None
+        self.assertIsNone(n.notebook_guid)
+
+        n.notebook = nb.guid
+        self.assertEqual(n.notebook_guid, nb.guid)
+
+    def test_tagGuids(self):
+        ts = testdata.random.sample(list(Tag.query.get()), 2)
+        n = Note()
+        n.tagGuids = [t.guid for t in ts]
+
+        tag_guids = set(t.guid for t in n.tags)
+        tag_guids2 = set(t.guid for t in ts)
+        self.assertEqual(tag_guids, tag_guids2)
+
+    def test_tags(self):
+        n = Note()
+        self.assertEqual([], n.tags)
+
+        n.tags.append(testdata.get_words(1))
+        n.tags.append(testdata.get_words(1))
+
+        for t in n.tags:
+            self.assertTrue(isinstance(t, Tag))
+            self.assertFalse(t.guid)
+
+        n.title = testdata.get_words()
+        n.plain = testdata.get_words()
+        n.save()
+        for t in n.tags:
+            self.assertTrue(t.guid)
+
+        n2 = Note.query.is_guid(n.guid).one()
+        tag_guids = set(t.guid for t in n.tags)
+        tag_guids2 = set(t.guid for t in n2.tags)
+        self.assertEqual(tag_guids, tag_guids2)
 
     def test_content(self):
         n = Note()
@@ -94,8 +137,14 @@ and they lived at the bottom of a well.</p>
 
 
 class NotebookTest(TestCase):
+
+    model_class = Notebook
+
     def get_query(self):
-        return Notebook.query
+        return self.model_class.query
+
+    def create_instance(self, *args, **kwargs):
+        return self.model_class(*args, **kwargs)
 
     def test_crud(self):
         nb = Notebook()
@@ -104,7 +153,7 @@ class NotebookTest(TestCase):
         self.assertIsNone(nb.created)
         self.assertIsNone(nb.updated)
 
-        name = testdata.get_unicode_words()
+        name = testdata.get_unicode_words(1)
         nb.name = name
         self.assertEqual(name, nb.name)
 
@@ -115,7 +164,7 @@ class NotebookTest(TestCase):
         self.assertIsNotNone(nb.updated)
 
         updated = nb.updated
-        name2 = testdata.get_words()
+        name2 = testdata.get_words(1)
         nb.name = name2
         self.assertNotEqual(name, nb.name)
         time.sleep(1)
@@ -130,7 +179,7 @@ class NotebookTest(TestCase):
         self.assertEqual(1, len(r))
 
         r = [nb.name for nb in self.get_query().limit(2).get()]
-        self.assertEqual(2, len(r))
+        self.assertGreaterEqual(2, len(r))
 
         nb = self.get_query().get_one()
         r = [nb.name for nb in self.get_query().is_guid(nb.guid).get()]
@@ -138,5 +187,20 @@ class NotebookTest(TestCase):
 
         r = [nb.name for nb in self.get_query().in_guid(nb.guid).get()]
         self.assertEqual(1, len(r))
+
+
+class TagTest(NotebookTest):
+    model_class = Tag
+
+    def test_dup(self):
+        t1 = self.create_instance(name=testdata.get_words(1))
+        self.assertIsNone(t1.guid)
+        t1.save()
+        self.assertIsNotNone(t1.guid)
+
+        t2 = self.create_instance(name=t1.name)
+        self.assertIsNone(t2.guid)
+        t2.save()
+        self.assertEqual(t1.guid, t2.guid)
 
 

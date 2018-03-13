@@ -1,21 +1,39 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 import datetime
+import re
+from collections import Sequence
 
 #import evernote.edam.notestore.ttypes as Notebook
-from evernote.edam.type.ttypes import Notebook as EvernoteNotebook, Note as EvernoteNote
+from evernote.edam.type.ttypes import \
+    Notebook as EvernoteNotebook, \
+    Note as EvernoteNote, \
+    Tag as EvernoteTag
+from evernote.edam.error.ttypes import EDAMUserException
 
-from .query import NoteQuery, NotebookQuery
+from .query import NoteQuery, NotebookQuery, TagQuery
 from .interface import get_interface
 from .decorators import classproperty
 from .compat import *
-from .utils import Plain, HTML, ENML
+from .utils import Plain, HTML, ENML, TypeList
 
 
 class Enbase(object):
     query_class = None
     """Query class that will be used to query the different child class things like
     notes or notebooks, this is set in the child classes"""
+
+    note_class = None
+    """set at the very bottom of this module"""
+
+    notebook_class = None
+    """set at the very bottom of this module"""
+
+    tag_class = None
+    """set at the very bottom of this module"""
+
+    struct_class = None
+    """This is the Evernote equivalent that each model wraps"""
 
     @classproperty
     def interface(cls):
@@ -66,6 +84,100 @@ class Enbase(object):
         return ret
 
 
+class Struct(Enbase):
+
+    @property
+    def notes(self):
+        """Returns all the notes in this notebook"""
+        #return self.note_class.query.is_notebook(self).all()
+        raise NotImplementedError()
+
+    @property
+    def created(self):
+        return self.convert_timestamp(self.struct.serviceCreated)
+
+    @property
+    def updated(self):
+        return self.convert_timestamp(self.struct.serviceUpdated)
+
+    @property
+    def guid(self):
+        return self.struct.guid
+
+    @property
+    def name(self):
+        return self.struct.name
+
+    @name.setter
+    def name(self, v):
+        self.struct.name = v
+
+    def __init__(self, struct=None, **kwargs):
+        self.struct = self.struct_class() if struct is None else struct
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    @classmethod
+    def assure_instance(cls, mixed):
+        """This just makes sure any input is a class instance we can use
+
+        :param mixed: Struct|string, already an instance or a guid or a name
+        :returns: Struct, an instance of this class
+        """
+        ret = mixed
+        if not isinstance(mixed, cls):
+            mixed = Plain(mixed)
+            if len(mixed) == 36 and re.match("^[a-f0-9\-]{36}$", mixed):
+                ret = cls.query.is_guid(mixed).one()
+
+            else:
+                ret = cls(name=mixed)
+
+        return ret
+
+    def save(self):
+        orig_name = self.struct.name
+
+        # handle unicode problems
+        if is_py2:
+            if isinstance(orig_name, unicode):
+                self.struct.name = orig_name.encode("utf-8")
+
+        if self.guid:
+            self.update()
+
+        else:
+            try:
+                self.insert()
+
+            except EDAMUserException as e:
+                if e.errorCode == 10:
+                    # data conflict, this probably already exists
+                    struct = self.query.is_name(self.name).one()
+                    if struct is None:
+                        raise
+
+                    else:
+                        self.struct = struct
+
+        self.struct.name = orig_name
+
+    def insert(self):
+        raise NotImplementedError()
+
+    def update(self):
+        raise NotImplementedError()
+
+    def count(self):
+        """Return how many notes are in this notebook"""
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_findNoteCounts (use this one)
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Struct_NoteCollectionCounts
+        #return self.note_class.query.is_notebook(self).count()
+        raise NotImplementedError()
+
+    __len__ = count
+
+
 class Note(Enbase):
     """Encapsulates Evernote's raw note information in order to make it more fluid
     so you don't have to worry about things like loading the full note and unicode
@@ -77,8 +189,7 @@ class Note(Enbase):
     query_class = NoteQuery
     """Query class that will be used to query notes"""
 
-    notebook_class = None
-    """set at the very bottom of this module"""
+    struct_class = EvernoteNote
 
     @property
     def created(self):
@@ -91,11 +202,48 @@ class Note(Enbase):
     @property
     def notebook(self):
         """Returns the notebook this note belongs to"""
-        return self.notebook_class.query.is_guid(self.notebookGuid).get_one()
+        if self._notebook is None:
+            guid = self.notebookGuid
+            if guid:
+                self._notebook = self.notebook_class.query.is_guid(guid).one()
+        return self._notebook
 
     @notebook.setter
     def notebook(self, nb):
-        self.notebookGuid = nb.guid
+        if nb is None:
+            self._notebook = None
+            self.notebookGuid = None
+
+        else:
+            nb = self.notebook_class.assure_instance(nb)
+            guid = nb.guid
+            if guid:
+                self.notebookGuid = guid
+            self._notebook = nb
+
+    @property
+    def tags(self):
+        if self._tags is None:
+            self._tags = TypeList(self.tag_class.assure_instance)
+            guids = self.tagGuids
+            if guids:
+                self._tags.extend(self.tag_class.query.in_guid(*guids).get())
+        return self._tags
+
+    @tags.setter
+    def tags(self, tags):
+        if tags is None:
+            self.tagGuids = None
+            self._tags = None
+
+        else:
+            if not isinstance(tags, Sequence):
+                tags = [tags]
+
+            self._tags = TypeList(self.tag_class.assure_instance, tags)
+            guids = filter(None, (t.guid for t in self._tags))
+            if guids:
+                self.tagGuids = guids
 
     @property
     def plain(self):
@@ -124,18 +272,14 @@ class Note(Enbase):
     def content(self, v):
         self.content = ENML(v)
 
-        # set the title if the html has a <title> tag and we don't have a title
-#         if not self.title:
-#             title = p.title
-#             if title:
-#                 self.title = title
-
-    def __init__(self, note=None, **kwargs):
-        if note:
-            self.note = note
+    def __init__(self, struct=None, **kwargs):
+        self._notebook = None
+        self._tags = None
+        if struct:
+            self.struct = struct
             self._hydrated = False
         else:
-            self.note = EvernoteNote()
+            self.struct = self.struct_class()
             self._hydrated = True
 
         for k, v in kwargs.items():
@@ -149,9 +293,9 @@ class Note(Enbase):
         guid = self.guid
         if self.guid:
             if not hydrated:
-                self.note = self.note_store.getNote(guid, True, False, False, False)
+                self.struct = self.note_store.getNote(guid, True, False, False, False)
 
-        return self.note
+        return self.struct
 
     def __getattr__(self, k):
         if k.startswith("_"):
@@ -159,12 +303,11 @@ class Note(Enbase):
 
         else:
             k = self.convert_key(k)
-            note = self.note
-            ret = getattr(self.note, k, None)
+            ret = getattr(self.struct, k, None)
 
             if ret is None and not self._hydrated:
                 self._hydrate()
-                ret = getattr(self.note, k)
+                ret = getattr(self.struct, k)
 
         return ret
 
@@ -172,7 +315,7 @@ class Note(Enbase):
         if k.startswith("_"):
             super(Note, self).__setattr__(k, v)
 
-        elif k == "note":
+        elif k == "struct":
             super(Note, self).__setattr__(k, v)
 
         elif k in self.__dict__:
@@ -180,8 +323,8 @@ class Note(Enbase):
 
         else:
             k = self.convert_key(k)
-            if hasattr(self.note, k):
-                setattr(self.note, k, v)
+            if hasattr(self.struct, k):
+                setattr(self.struct, k, v)
 
             else:
                 super(Note, self).__setattr__(k, v)
@@ -204,28 +347,42 @@ class Note(Enbase):
                     setattr(self, k, ov.encode("utf-8"))
                     orig_vals[k] = ov
 
+        nb = self._notebook
+        if nb is not None:
+            if not nb.guid:
+                nb.save()
+                self.notebookGuid = nb.guid
+
+        tags = self._tags
+        if tags is not None:
+            tag_guids = []
+            for t in tags:
+                if not t.guid:
+                    t.save()
+                tag_guids.append(t.guid)
+            self.tagGuids = tag_guids
+
         if self.guid:
             # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_updateNotebook
-            n = note_store.updateNote(self.note)
+            n = note_store.updateNote(self.struct)
 
         else:
             # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_createNotebook
-            n = note_store.createNote(self.note)
+            n = note_store.createNote(self.struct)
 
-        self.note = n
+        self.struct = n
 
         for k, v in orig_vals.items():
             setattr(self, k, v)
 
 
-class Notebook(Enbase):
+class Notebook(Struct):
     """
     https://dev.evernote.com/doc/reference/Types.html#Struct_Notebook
     """
     query_class = NotebookQuery
 
-    note_class = None
-    """set at the bottom of this module"""
+    struct_class = EvernoteNotebook
 
     @property
     def notes(self):
@@ -233,74 +390,30 @@ class Notebook(Enbase):
         return self.note_class.query.is_notebook(self).all()
 
     @property
-    def created(self):
-        ret = None
-        ts = self.notebook.serviceCreated
-        if ts:
-            ts = int(str(ts)[0:-3])
-            ret = datetime.datetime.utcfromtimestamp(ts)
-        return ret
-
-    @property
-    def updated(self):
-        ret = None
-        ts = self.notebook.serviceUpdated
-        if ts:
-            ts = int(str(ts)[0:-3])
-            ret = datetime.datetime.utcfromtimestamp(ts)
-        return ret
-
-    @property
-    def guid(self):
-        return self.notebook.guid
-
-    @property
-    def name(self):
-        return self.notebook.name
-
-    @name.setter
-    def name(self, v):
-        self.notebook.name = v
-
-    @property
     def default(self):
-        return self.notebook.defaultNotebook
+        return self.struct.defaultNotebook
 
     @default.setter
     def default(self, v):
-        self.notebook.default = bool(v)
-
-    def __init__(self, notebook=None, **kwargs):
-        self.notebook = EvernoteNotebook() if notebook is None else notebook
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        self.struct.default = bool(v)
 
     def is_default(self):
         return self.default
 
-    def save(self):
-
-        orig_name = self.notebook.name
+    def update(self):
         note_store = self.note_store
 
-        # handle unicode problems
-        if is_py2:
-            if isinstance(orig_name, unicode):
-                self.notebook.name = orig_name.encode("utf-8")
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_updateNotebook
+        note_store.updateNotebook(self.struct)
+        # ugh, why would they not return the updated notebook? Sigh
+        nb = note_store.getNotebook(self.guid)
+        self.struct = nb
 
-        if self.guid:
-            # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_updateNotebook
-            note_store.updateNotebook(self.notebook)
-            # ugh, why would they not return the updated notebook? Sigh
-            nb = note_store.getNotebook(self.guid)
-            self.notebook = nb
-
-        else:
-            # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_createNotebook
-            nb = note_store.createNotebook(self.notebook)
-            self.notebook = nb
-
-        self.notebook.name = orig_name
+    def insert(self):
+        note_store = self.note_store
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_createNotebook
+        nb = note_store.createNotebook(self.struct)
+        self.struct = nb
 
     def count(self):
         """Return how many notes are in this notebook"""
@@ -308,9 +421,30 @@ class Notebook(Enbase):
         # http://dev.evernote.com/doc/reference/NoteStore.html#Struct_NoteCollectionCounts
         return self.note_class.query.is_notebook(self).count()
 
-    __len__ = count
+
+class Tag(Struct):
+    """
+    http://dev.evernote.com/doc/reference/Types.html#Struct_Tag
+    """
+    query_class = TagQuery
+
+    struct_class = EvernoteTag
+
+    def update(self):
+        note_store = self.note_store
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_updateTag
+        note_store.updateTag(self.struct)
+        tag = note_store.getTag(self.guid)
+        self.struct = tag
+
+    def insert(self):
+        note_store = self.note_store
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_createTag
+        tag = note_store.createTag(self.struct)
+        self.struct = tag
 
 
-Note.notebook_class = Notebook
-Notebook.note_class = Note
+Enbase.note_class = Note
+Enbase.notebook_class = Notebook
+Enbase.tag_class = Tag
 

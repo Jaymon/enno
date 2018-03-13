@@ -38,7 +38,7 @@ class Iterator(list):
 
         else:
             note = super(Iterator, self).__getitem__(index)
-            instance = self.model_class(note=note)
+            instance = self.model_class(note)
 
         return instance
 
@@ -63,7 +63,7 @@ class Iterator(list):
             else:
                 offset = index + self.query.bounds["offset"]
                 note = self.query.copy().offset(offset).get_one()
-                instance = self.model_class(note=note)
+                instance = self.model_class(note)
 
         return instance
 
@@ -354,9 +354,9 @@ class NoteQuery(object):
 
 
 class NotebookQuery(object):
-    def __init__(self, notebook_class):
-        self.model_class = notebook_class
-        self.interface = notebook_class.interface
+    def __init__(self, model_class):
+        self.model_class = model_class
+        self.interface = model_class.interface
         self.note_store = self.interface.get_note_store()
         self.filter_cbs = []
         self.sort_kwargs = {}
@@ -419,19 +419,29 @@ class NotebookQuery(object):
         self.bounds["limit"] = int(limit)
         return self
 
+    def get_guid(self, guid):
+        model = self.note_store.getNotebook(guid)
+        return self._create_model(model) if model else None
+
+    def _get_list(self):
+        return self.note_store.listNotebooks()
+
+    def _create_model(self, model):
+        return self.model_class(model)
+
     def get(self):
         limit = self.bounds["limit"]
         count = 0
 
         if len(self.guids) == 1:
-            enb = self.note_store.getNotebook(list(self.guids)[0])
-            nb = self.model_class(notebook=enb)
-            yield nb
+            model = self.get_guid(list(self.guids)[0])
+            if model is not None:
+                yield model
 
         else:
             ret = []
-            for enb in self.note_store.listNotebooks():
-                nb = self.model_class(notebook=enb)
+            for enb in self._get_list():
+                nb = self._create_model(enb)
 
                 if self.guids:
                     if nb.guid in self.guids and self._filter(nb):
@@ -470,4 +480,16 @@ class NotebookQuery(object):
         for _ in self.get():
             count += 1
         return count
+
+
+class TagQuery(NotebookQuery):
+    def get_guid(self, guid):
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_getTag
+        model = self.note_store.getTag(guid)
+        return self._create_model(model) if model else None
+
+    def _get_list(self):
+        # http://dev.evernote.com/doc/reference/NoteStore.html#Fn_NoteStore_listTags
+        return self.note_store.listTags()
+
 
