@@ -64,5 +64,10 @@ def main_oauth(consumer_key, consumer_secret, sandbox):
     s.handle_request()
 
 
-exit(__name__)
+def console():
+    """here as a hook for python in setup.py"""
+    exit(__name__)
+
+if __name__ == "__main__":
+    console()
 

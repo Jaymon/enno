@@ -101,5 +101,5 @@ Use pip:
 
 To get the latest and greatest:
 
-    $ pip install git+https://github.com/jaymon/enno#egg=enno
+    $ pip install -U "git+https://github.com/jaymon/enno#egg=enno"
 

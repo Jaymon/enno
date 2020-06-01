@@ -46,10 +46,10 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
     ],
-#     entry_points = {
-#         'console_scripts': [
-#             '{} = {}:console'.format(name, name),
-#         ],
-#     }
+    entry_points = {
+        'console_scripts': [
+            '{} = {}:console'.format(name, name),
+        ],
+    },
 )
 
