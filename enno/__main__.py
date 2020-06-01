@@ -57,7 +57,7 @@ def main_oauth(consumer_key, consumer_secret, sandbox):
 
     request_token = client.get_request_token(s.netloc)
     auth_url = client.get_authorize_url(request_token)
-    subprocess.run(["open", auth_url])
+    subprocess.call(["open", auth_url])
     s.handle_request()
 
 
