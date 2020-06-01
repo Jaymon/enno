@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
+import subprocess
 
 from captain import exit, echo
 from captain.decorators import arg
-from captain.client import Captain
 from evernote.api.client import EvernoteClient
 
 from enno.server import AuthServer
@@ -57,10 +57,7 @@ def main_oauth(consumer_key, consumer_secret, sandbox):
 
     request_token = client.get_request_token(s.netloc)
     auth_url = client.get_authorize_url(request_token)
-    c = Captain('open "{}"'.format(auth_url))
-    c.cmd_prefix = ""
-    c.run()
-
+    subprocess.run(["open", auth_url])
     s.handle_request()
 
 
