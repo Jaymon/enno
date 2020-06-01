@@ -48,7 +48,7 @@ setup(
     ],
     entry_points = {
         'console_scripts': [
-            '{} = {}:console'.format(name, name),
+            '{} = {}.__main__:console'.format(name, name),
         ],
     },
 )
