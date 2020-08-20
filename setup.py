@@ -5,9 +5,14 @@ from setuptools import setup, find_packages
 import re
 import os
 from codecs import open
+import sys
 
 
 name = "enno"
+_ver = sys.version_info
+is_py2 = (_ver[0] == 2)
+is_py3 = (_ver[0] == 3)
+
 
 def read(path):
     if os.path.isfile(path):
@@ -24,7 +29,7 @@ with open(vpath, encoding="utf-8") as f:
 long_description = read('README.rst')
 
 tests_modules = ["testdata", "requests"]
-install_modules = ["evernote", "captain", "beautifulsoup4"]
+install_modules = ["evernote" if is_py2 else "evernote3", "captain", "beautifulsoup4"]
 
 setup(
     name=name,

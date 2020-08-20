@@ -10,7 +10,7 @@ from .interface import get_interface
 from .model import Note, Notebook, Tag
 
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 
 def check_api():
